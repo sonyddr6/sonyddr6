@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplicativo Web que se Comunica com Outra Página</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      color: #333;
+    }
+    #resultado {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    img {
+      border-radius: 50%;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #28a745;
+      color: #fff;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+  <h1>Aplicativo Web</h1>
+  <button id="botaoRequisicao">Buscar Informações do GitHub</button>
+  <div id="resultado"></div>
+
+  <script>
+    document.getElementById("botaoRequisicao").addEventListener("click", function() {
+      // URL da API do GitHub para o usuário "octocat"
+      const url = 'https://api.github.com/users/octocat';
+
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Erro na requisição: ' + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Exibe os dados do usuário na div de resultado
+          document.getElementById("resultado").innerHTML = `
+            <h2>${data.login}</h2>
+            <img src="${data.avatar_url}" alt="${data.login}" width="100" />
+            <p><strong>ID:</strong> ${data.id}</p>
+            <p><strong>URL:</strong> <a href="${data.html_url}" target="_blank">${data.html_url}</a></p>
+          `;
+        })
+        .catch(error => {
+          console.error('Erro:', error);
+          document.getElementById("resultado").innerText = 'Erro ao fazer a requisição.';
+        });
+    });
+  </script>
+</body>
+</html>
