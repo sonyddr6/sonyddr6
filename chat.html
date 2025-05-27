@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Gemini Matrix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Matrix Theme Styles */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            font-family: 'Fira Code', monospace;
+            color: #00ff88;
+        }
+
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .chat-window {
+            background-color: rgba(0, 0, 0, 0.95);
+            border: 2px solid #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Matrix Theme for Elements */
+        input, select, button {
+            background-color: rgba(0, 0, 0, 0.8) !important;
+            border: 1px solid #00ff88 !important;
+            color: #00ff88 !important;
+            font-family: 'Fira Code', monospace !important;
+        }
+
+        button:hover {
+            background-color: rgba(0, 255, 136, 0.2) !important;
+        }
+
+        .message-bubble {
+            background-color: rgba(0, 0, 0, 0.8) !important;
+            border: 1px solid #00ff88 !important;
+            color: #00ff88 !important;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.1)) !important;
+        }
+
+        /* Existing styles with Matrix theme adjustments */
+        :root {
+            --primary: #00ff88;
+            --primary-dark: #00cc6a;
+            --secondary: #00ff88;
+            --dark: #000000;
+            --light: #00ff88;
+            --gray: #00ff88;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        @keyframes typingDots {
+            0%, 20% { content: "."; }
+            40% { content: ".."; }
+            60%, 100% { content: "..."; }
+        }
+
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .message-enter {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .typing-indicator::after {
+            content: "...";
+            animation: typingDots 1.5s infinite;
+        }
+
+        .chat-container {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .message-bubble {
+            border-radius: 1.125rem 1.125rem 1.125rem 0;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+            transition: all 0.3s ease;
+        }
+
+        .message-bubble.user {
+            border-radius: 1.125rem 1.125rem 0 1.125rem;
+        }
+
+        .message-bubble:hover {
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+        }
+
+        .input-field {
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .input-field:focus {
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+        }
+
+        .send-button {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .send-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .send-button:active {
+            transform: translateY(0);
+        }
+
+        .modal-content {
+            animation: fadeIn 0.3s ease-out;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            background-color: var(--primary);
+        }
+
+        .bot-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--secondary);
+            color: white;
+        }
+
+        .markdown-content p {
+            margin-bottom: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .markdown-content ul, .markdown-content ol {
+            margin-left: 1.25rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .markdown-content li {
+            margin-bottom: 0.25rem;
+        }
+
+        .markdown-content code {
+            background-color: rgba(0, 0, 0, 0.05);
+            color: var(--danger);
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .markdown-content pre {
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            overflow-x: auto;
+            margin-bottom: 0.75rem;
+        }
+
+        .markdown-content pre code {
+            background-color: transparent;
+            padding: 0;
+            color: inherit;
+        }
+
+        .markdown-content a {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .markdown-content a:hover {
+            color: var(--primary-dark);
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @media (max-width: 640px) {
+            .mobile-flex-col {
+                flex-direction: column;
+            }
+            
+            .mobile-w-full {
+                width: 100% !important;
+            }
+            
+            .mobile-mt-2 {
+                margin-top: 0.5rem;
+            }
+        }
+        @media (max-width: 768px) {
+            .messages-container {
+                width: 100%;
+                max-width: 100%;
+                padding: 10px;
+                margin: 0 auto;
+                box-sizing: border-box;
+            }
+
+            .message-bubble {
+                margin: 8px 0;
+                padding: 12px 15px;
+                font-size: 16px;
+                line-height: 1.5;
+                background-color: #f5f5f5;
+                border-radius: 10px;
+                word-wrap: break-word;
+            }
+
+            .message-header,
+            .message-footer {
+                display: none;
+            }
+
+            #chat-messages {
+                padding: 10px !important;
+            }
+
+            .user-avatar,
+            .bot-avatar {
+                width: 28px;
+                height: 28px;
+                font-size: 0.875rem;
+            }
+
+            .mobile-flex-col {
+                flex-direction: column !important;
+            }
+            
+
+
+            .mobile-w-full {
+                width: 100% !important;
+            }
+        }
+
+        /* Adicione estes estilos para controlar o menu móvel */
+        @media (max-width: 768px) {
+            .controls-container {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 10px;
+                border-top: 1px solid #e5e7eb;
+                transform: translateY(100%);
+                transition: transform 0.3s ease-in-out;
+                z-index: 40;
+                box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+            }
+
+            .controls-container.active {
+                transform: translateY(0);
+            }
+
+            .toggle-controls {
+                position: fixed;
+                bottom: 70px;
+                right: 20px;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background: var(--primary);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                z-index: 41;
+                transition: transform 0.3s ease;
+            }
+
+            .toggle-controls.active {
+                transform: rotate(180deg);
+            }
+
+            /* Ajuste o espaçamento do container de mensagens */
+            .chat-container {
+                padding-bottom: 70px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            /* Ajusta o container principal para considerar o teclado móvel */
+            .chat-container {
+                height: calc(100vh - 80px);
+                padding-bottom: 60px; /* Espaço para o form fixo */
+            }
+
+            /* Form de input fixo na parte inferior */
+            .message-form-container {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: #f9fafb;
+                padding: 10px;
+                border-top: 1px solid #e5e7eb;
+                z-index: 40;
+            }
+
+            /* Status e contagem de mensagens */
+            .message-info {
+                position: fixed;
+                top: 80px; /* Logo abaixo do header */
+                left: 0;
+                right: 0;
+                background: rgba(249, 250, 251, 0.95);
+                padding: 5px 10px;
+                font-size: 0.75rem;
+                border-bottom: 1px solid #e5e7eb;
+                z-index: 39; /* Abaixo do botão toggle mas acima do conteúdo */
+            }
+
+            /* Botão toggle reposicionado para abaixo do header */
+            .toggle-controls {
+                position: fixed;
+                top: 80px; /* Ajustado para ficar abaixo do header */
+                right: 15px;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background: var(--primary);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                z-index: 41;
+                transition: transform 0.3s ease;
+            }
+
+            /* Ajusta o padding do conteúdo */
+            .controls-container {
+                padding-top: 40px; /* Reduzido para compensar nova posição do botão */
+            }
+
+            /* Ajusta margem superior do container de mensagens */
+            .chat-container {
+                margin-top: 30px; /* Espaço para a message-info */
+            }
+
+            /* Garante que o header não seja sobreposto */
+            header {
+                z-index: 42;
+            }
+        }
+
+        .loading-indicator {
+            text-align: center;
+            padding: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix" class="matrix-bg"></canvas>
+
+    <!-- Your existing chat HTML structure with class="chat-window" -->
+    <div class="chat-window">
+        <!-- Welcome Modal -->
+        <div id="welcome-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="modal-content bg-white rounded-xl p-6 max-w-md w-full mx-4 transform transition-all">
+                <div class="flex justify-center mb-4">
+                    <div class="gradient-bg text-white p-3 rounded-full animate-float">
+                        <i class="fas fa-robot text-2xl"></i>
+                    </div>
+                </div>
+                <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Bem-vindo ao Chat Gemini!</h2>
+                <p class="text-gray-600 text-center mb-4">Escolha um nome de usuário para começar</p>
+                
+                <div class="mb-4">
+                    <input type="text" id="username-input" placeholder="Seu nome de usuário" 
+                           class="username-input input-field w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <p id="username-error" class="text-sm text-red-500 mt-2 h-4"></p>
+                </div>
+                
+                <button id="save-username-btn" class="w-full gradient-bg text-white px-4 py-3 rounded-lg font-semibold transition-all hover:opacity-90 active:scale-95">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Entrar no Chat
+                </button>
+                
+                <p class="text-xs text-gray-500 mt-4 text-center">Seu nome será visível para outros usuários</p>
+            </div>
+        </div>
+
+        <!-- Main Chat Container -->
+        <div class="container mx-auto max-w-4xl h-screen flex flex-col p-2 sm:p-4">
+            <!-- Header -->
+            <header class="gradient-bg text-white rounded-xl shadow-md p-3 mb-3 sm:mb-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bot-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg sm:text-xl font-bold">Chat Gemini</h1>
+                        <p class="text-xs opacity-80">Conecte-se e converse com IA</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <div id="user-info" class="flex items-center space-x-2">
+                        <div id="user-avatar" class="user-avatar hidden"></div>
+                        <div class="hidden sm:block">
+                            <span id="username-display" class="text-sm font-medium">...</span>
+                            <span class="text-xs opacity-70 block">ID: <span id="device-id-display">...</span></span>
+                        </div>
+                    </div>
+                    
+                    <div id="user-status" class="flex items-center space-x-1 bg-white bg-opacity-20 px-2 py-1 rounded-full">
+                        <span id="status-indicator" class="h-2 w-2 rounded-full bg-gray-300"></span>
+                        <span id="status-text" class="text-xs">Offline</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Botão toggle para controles móveis -->
+            <button class="toggle-controls hidden md:hidden">
+                <i class="fas fa-cog"></i>
+            </button>
+
+            <!-- Wrap os controles existentes em um container -->
+            <div class="controls-container">
+                <!-- Controls -->
+                <div class="mb-3 sm:mb-4 bg-white rounded-xl shadow-sm p-3 flex flex-col md:flex-row gap-4 mobile-flex-col">
+                    <div class="w-full md:w-auto mobile-w-full">
+                        <label for="model-select" class="block text-sm font-medium text-gray-700 mb-1">Modelo de IA:</label>
+                        <select id="model-select" class="block w-full pl-3 pr-10 py-2 text-sm border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent input-field">
+                            <!-- Options will be populated by JS -->
+                        </select>
+                    </div>
+                    
+                    <div class="flex-grow mobile-w-full">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Visualização:</label>
+                        <div class="flex flex-wrap gap-2 items-center mobile-flex-col mobile-items-stretch">
+                            <button id="btn-general-chat" class="chat-view-button chat-view-button-active px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                                <i class="fas fa-users mr-2"></i> Geral
+                            </button>
+                            <button id="btn-my-chat" class="chat-view-button px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                                <i class="fas fa-user mr-2"></i> Meu Chat
+                            </button>
+                            <div class="flex items-center gap-2 flex-grow mobile-w-full mobile-mt-2">
+                                <input type="text" id="user-search-input" placeholder="Buscar usuário..." 
+                                       class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 input-field">
+                                <button id="btn-other-chat" class="chat-view-button px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
+                                    <i class="fas fa-search mr-2"></i> Buscar
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2" id="current-chat-info">Visualizando: Chat Geral</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col flex-grow min-h-0 chat-container">
+                <div id="chat-messages" class="p-3 sm:p-4 space-y-4 overflow-y-auto flex-grow min-h-0 scrollbar-hide">
+                    <div class="loading-indicator">
+                        <div class="typing-dots flex space-x-1 justify-center">
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                        </div>
+                        <span class="text-sm text-gray-500">Carregando mensagens antigas...</span>
+                    </div>
+                    <div class="text-center text-gray-500 py-10 initial-message">
+                        <div class="gradient-bg text-white p-4 rounded-full inline-block mb-3 animate-float">
+                            <i class="fas fa-comments text-2xl"></i>
+                        </div>
+                        <p class="text-sm sm:text-base font-medium">Carregando conversas...</p>
+                        <p class="text-xs mt-2">Aguarde enquanto carregamos as mensagens</p>
+                    </div>
+                </div>
+                
+                <div id="typing-indicator" class="hidden bg-gray-50 px-4 py-3 text-gray-500 text-sm flex items-center">
+                    <div class="typing-dots flex space-x-1 mr-3">
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                    </div>
+                    <span class="typing-indicator">Gemini está digitando</span>
+                </div>
+                
+                <div class="message-form-container">
+                    <form id="message-form" class="flex space-x-2">
+                        <input id="message-input" type="text" placeholder="Digite sua mensagem..." 
+                               class="flex-1 px-4 py-3 rounded-full border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm sm:text-base input-field" 
+                               autocomplete="off" disabled>
+                        <button type="submit" aria-label="Enviar mensagem" 
+                                class="gradient-bg text-white px-4 py-3 rounded-full transition-all send-button flex items-center justify-center" disabled>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </form>
+                    <div class="message-info flex justify-between items-center mt-2">
+                        <span id="connection-status" class="text-xs text-gray-500 flex items-center">
+                            <i class="fas fa-circle mr-1 text-gray-400"></i> Conectando...
+                        </span>
+                        <span id="message-count" class="text-xs text-gray-500">0 mensagens</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Matrix animation script -->
+    <script>
+        // Matrix animation code
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        
+        const characters = 'アァカサタナハマヤャラワガザダバパ' +
+                           'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
+                           '0123456789';
+        const charArray = characters.split('');
+        
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+        const drops = new Array(Math.floor(columns)).fill(1);
+        
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#00ff88';
+            ctx.font = fontSize + 'px Fira Code';
+            
+            for (let i = 0; i < drops.length; i++) {
+                const text = charArray[Math.floor(Math.random() * charArray.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        
+        setInterval(draw, 50);
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+
+    <!-- Your existing scripts -->
+    <script type="module">
+        // Import do SDK Gemini AI
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+        // Configuração Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBL7oI8tr3rseMyQW6ouPVwbfZKGUfwJ1s",
+            authDomain: "gaamini-teste-api.firebaseapp.com",
+            projectId: "gaamini-teste-api",
+            storageBucket: "gaamini-teste-api.appspot.com",
+            messagingSenderId: "1080485760423",
+            appId: "1:1080485760423:web:8e4befd62dbf6106ff7a82",
+            measurementId: "G-VD9JE84V5N"
+        };
+
+        // Chave da API Gemini
+        const GEMINI_API_KEY = "AIzaSyDF5wOFJPEuhrlD9s0m1ZjYLg-IIPWsCRg";
+
+        // Modelos Disponíveis
+        const AVAILABLE_MODELS = [
+            { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash" }
+        ];
+
+        // Estado Global
+        let currentModelId = AVAILABLE_MODELS[0].id;
+        let currentChatView = 'general';
+        let targetChatId = null;
+        let USER_DEVICE_ID = null;
+        let USERNAME = null;
+        let genAI;
+        let chat = null;
+        let currentFirebaseListener = null;
+        let currentMessagesRef = null;
+        let isGeminiTyping = false;
+        let messageCounter = 0;
+        let initialLoadComplete = false;
+        let isLoadingMore = false;
+        let firstMessageTimestamp = null;
+        const MESSAGES_PER_PAGE = 50;
+
+        // Inicialização Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+        } catch (error) {
+            console.error("Erro ao inicializar Firebase:", error);
+            alert("Erro crítico: Não foi possível conectar ao Firebase.");
+        }
+        const database = firebase.database();
+        const connectedRef = database.ref(".info/connected");
+
+        // Inicialização Gemini AI
+        try {
+            if (!GEMINI_API_KEY || GEMINI_API_KEY === "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXX") {
+                throw new Error("Chave da API Gemini não configurada!");
+            }
+            genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        } catch (error) {
+            console.error("Erro ao inicializar SDK Gemini:", error);
+            alert(`Erro crítico: ${error.message}. A funcionalidade de IA pode não funcionar.`);
+            document.getElementById('message-input').disabled = true;
+            document.querySelector('#message-form button[type="submit"]').disabled = true;
+        }
+
+        // Elementos do DOM
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        const messageSubmitButton = messageForm.querySelector('button[type="submit"]');
+        const chatMessages = document.getElementById('chat-messages');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const connectionStatus = document.getElementById('connection-status');
+        const messageCount = document.getElementById('message-count');
+        const modelSelect = document.getElementById('model-select');
+        const deviceIdDisplay = document.getElementById('device-id-display');
+        const btnGeneralChat = document.getElementById('btn-general-chat');
+        const btnMyChat = document.getElementById('btn-my-chat');
+        const btnOtherChat = document.getElementById('btn-other-chat');
+        const userSearchInput = document.getElementById('user-search-input');
+        const currentChatInfo = document.getElementById('current-chat-info');
+        const welcomeModal = document.getElementById('welcome-modal');
+        const usernameInput = document.getElementById('username-input');
+        const saveUsernameBtn = document.getElementById('save-username-btn');
+        const usernameDisplay = document.getElementById('username-display');
+        const usernameError = document.getElementById('username-error');
+        const userAvatar = document.getElementById('user-avatar');
+
+        // Funções Utilitárias
+        function sanitizeForFirebasePath(id) {
+            if (!id) return '';
+            return id.replace(/[.#$[\]/]/g, '_');
+        }
+
+        function escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') return "";
+            return unsafe.replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#039;");
+        }
+
+        function formatMarkdown(text) {
+            if (typeof text !== 'string') return '';
+            
+            // Processa blocos de código
+            const cb = {};
+            let bi = 0;
+            let esc = text.replace(/```([\s\S]*?)```/gs, (m, c) => {
+                const p = `__CB_${bi++}__`;
+                cb[p] = `<pre><code>${escapeHtml(c)}</code></pre>`;
+                return p;
+            });
+            
+            // Links
+            esc = esc.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">$1</a>');
+            
+            // Negrito e itálico
+            esc = esc.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            esc = esc.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+            
+            // Código inline
+            esc = esc.replace(/`([^`]+)`/g, (m, c) => `<code>${escapeHtml(c)}</code>`);
+            
+            // Listas
+            const li = esc.split('\n');
+            let hl = [];
+            let il = null;
+            
+            li.forEach(l => {
+                const ul = l.match(/^(\s*)([-*+])\s+(.*)/);
+                const ol = l.match(/^(\s*)(\d+\.)\s+(.*)/);
+                
+                if (ul) {
+                    if (il !== 'ul') {
+                        if (il) hl.push(`</${il}>`);
+                        hl.push('<ul>');
+                        il = 'ul';
+                    }
+                    hl.push(`<li>${ul[3]}</li>`);
+                } else if (ol) {
+                    if (il !== 'ol') {
+                        if (il) hl.push(`</${il}>`);
+                        hl.push('<ol>');
+                        il = 'ol';
+                    }
+                    hl.push(`<li>${ol[3]}</li>`);
+                } else {
+                    if (il) {
+                        hl.push(`</${il}>`);
+                        il = null;
+                    }
+                    hl.push(l);
+                }
+            });
+            
+            if (il) {
+                hl.push(`</${il}>`);
+            }
+            
+            esc = hl.join('\n');
+            
+            // Restaura blocos de código
+            for (const p in cb) {
+                esc = esc.replace(p, () => cb[p]);
+            }
+            
+            // Parágrafos
+            const paras = esc.split(/\n\s*\n/)
+                .map(p => p.trim())
+                .filter(p => p)
+                .map(p => {
+                    if (p.match(/^<(ul|ol|pre|h[1-6]|li|blockquote)/)) return p;
+                    return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+                })
+                .join('');
+            
+            return paras;
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp || typeof timestamp !== 'number') return '';
+            try {
+                const d = new Date(timestamp);
+                if (isNaN(d.getTime())) return '';
+                const n = new Date();
+                const today = d.getDate() === n.getDate() && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+                if (today) {
+                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else {
+                    return d.toLocaleTimeString([], { day: '2-digit', month: '2-digit', year:'2-digit', hour: '2-digit', minute: '2-digit' });
+                }
+            } catch (e) {
+                console.error("Erro formatar hora:", e, timestamp);
+                return '';
+            }
+        }
+
+        function scrollToBottom() {
+            setTimeout(() => {
+                if(chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 100);
+        }
+
+        function updateMessageCountDisplay() {
+            let dn = currentModelId.replace('-latest','').replace('gemini-1.5-','g1.5-').replace('gemini-','g-');
+            let ctl = '';
+            if(currentChatView === 'general') ctl='Geral';
+            else if(currentChatView === 'own') ctl='Meu';
+            else if(currentChatView === 'other' && targetChatId) ctl=`Outro (${targetChatId.substring(0,6)}...)`;
+            else ctl='?';
+            if(messageCount) messageCount.textContent = `${messageCounter} mensagens (${ctl} / ${dn})`;
+        }
+
+        function updateChatInfoLabel() {
+            let info = 'Visualizando: ';
+            if(currentChatView === 'general') info+='Chat Geral';
+            else if(currentChatView === 'own') info+='Meu Chat Pessoal';
+            else if(currentChatView === 'other' && targetChatId) info+=`Chat de ${targetChatId.substring(0,8)}...`;
+            else info+='Desconhecido';
+            if(currentChatInfo) currentChatInfo.textContent = info;
+        }
+
+        function updateActiveButton() {
+            document.querySelectorAll('.chat-view-button').forEach(b => {
+                b.classList.remove('chat-view-button-active', 'gradient-bg', 'text-white');
+                b.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+            });
+            const activeBtnId = currentChatView === 'general' ? 'btn-general-chat' : 
+                              currentChatView === 'own' ? 'btn-my-chat' : 
+                              currentChatView === 'other' ? 'btn-other-chat' : null;
+            if (activeBtnId) {
+                const activeBtn = document.getElementById(activeBtnId);
+                if(activeBtn) {
+                    activeBtn.classList.add('chat-view-button-active', 'gradient-bg', 'text-white');
+                    activeBtn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                }
+            }
+        }
+
+        // Funções de Usuário
+        function getOrCreateDeviceId() {
+            let d = localStorage.getItem('userDeviceId');
+            if (!d) {
+                d = 'user-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+                localStorage.setItem('userDeviceId', d);
+                console.log('Novo ID de dispositivo criado:', d);
+            } else {
+                console.log('Usando ID de dispositivo existente:', d);
+            }
+            return d;
+        }
+
+        function updateUserDisplay() {
+            if (USERNAME && usernameDisplay) {
+                usernameDisplay.textContent = USERNAME;
+                if (userAvatar) {
+                    userAvatar.textContent = USERNAME.charAt(0).toUpperCase();
+                    userAvatar.classList.remove('hidden');
+                }
+            } else if (usernameDisplay) {
+                usernameDisplay.textContent = '...';
+            }
+            if (USER_DEVICE_ID && deviceIdDisplay) {
+                const shortId = USER_DEVICE_ID.substring(0, 8) + '...';
+                deviceIdDisplay.textContent = shortId;
+            }
+        }
+
+        async function saveUserToFirebase() {
+            if (!USER_DEVICE_ID || !USERNAME) {
+                console.error("Tentativa de salvar usuário no Firebase sem ID ou Nome.");
+                return;
+            }
+            console.log(`Salvando/Atualizando usuário no Firebase: ID=${USER_DEVICE_ID}, Nome=${USERNAME}`);
+            const userRef = database.ref(`users/${USER_DEVICE_ID}`);
+            const usernameRef = database.ref(`usernames/${USERNAME}`);
+
+            try {
+                await userRef.update({
+                    username: USERNAME,
+                    lastActive: firebase.database.ServerValue.TIMESTAMP
+                });
+
+                await usernameRef.set(USER_DEVICE_ID);
+                console.log("Dados do usuário salvos no Firebase com sucesso.");
+            } catch (error) {
+                console.error("Erro ao salvar dados do usuário no Firebase:", error);
+            }
+        }
+
+        function showWelcomeModal() {
+            if (welcomeModal) {
+                welcomeModal.classList.remove('hidden');
+                if (usernameInput) usernameInput.focus();
+            } else {
+                console.error("Modal de boas-vindas não encontrado no DOM.");
+            }
+        }
+
+        async function handleSaveUsername() {
+            const newUsername = usernameInput.value.trim().toLowerCase();
+            usernameError.textContent = '';
+
+            if (newUsername.length < 3 || newUsername.length > 15) {
+                usernameError.textContent = 'Nome deve ter entre 3 e 15 caracteres.';
+                return;
+            }
+            if (!/^[a-z0-9]+(?:[_-]?[a-z0-9]+)*$/i.test(newUsername)) {
+                usernameError.textContent = 'Use apenas letras, números, _ ou -. Sem espaços.';
+                return;
+            }
+            if (['admin', 'gemini', 'geral', 'sistema'].includes(newUsername)) {
+                usernameError.textContent = 'Esse nome não é permitido.';
+                return;
+            }
+
+            saveUsernameBtn.disabled = true;
+            saveUsernameBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Verificando...';
+
+            try {
+                const snapshot = await database.ref(`usernames/${newUsername}`).once('value');
+                const existingDeviceId = snapshot.val();
+
+                if (existingDeviceId && existingDeviceId !== USER_DEVICE_ID) {
+                    // Verifica se o usuário existente está ativo
+                    const userRef = database.ref(`users/${existingDeviceId}`);
+                    const userSnapshot = await userRef.once('value');
+                    const userData = userSnapshot.val();
+
+                    if (userData) {
+                        const lastActive = userData.lastActive || 0;
+                        const currentTime = Date.now();
+                        const inactiveThreshold = 5 * 60 * 1000; // 5 minutos de inatividade
+
+                        if (currentTime - lastActive < inactiveThreshold) {
+                            usernameError.textContent = 'Este nome já está em uso!';
+                            saveUsernameBtn.disabled = false;
+                            saveUsernameBtn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> Entrar no Chat';
+                            return;
+                        } else {
+                            console.log(`Liberando nome inativo ${newUsername} do usuário ${existingDeviceId}`);
+                            // Libera nome de usuário inativo
+                            await database.ref(`usernames/${newUsername}`).set(USER_DEVICE_ID);
+                            await userRef.update({ username: null });
+                        }
+                    }
+                }
+
+                USERNAME = newUsername;
+                localStorage.setItem('username', USERNAME);
+
+                if (welcomeModal) welcomeModal.classList.add('hidden');
+                updateUserDisplay();
+                await saveUserToFirebase();
+
+                console.log(`Nome de usuário '${USERNAME}' definido e salvo.`);
+                initialLoadComplete = true;
+                loadChatHistoryAndInit();
+                startActivityUpdates();
+
+            } catch (error) {
+                console.error("Erro ao verificar/salvar nome de usuário:", error);
+                usernameError.textContent = 'Erro ao verificar. Tente novamente.';
+                saveUsernameBtn.disabled = false;
+                saveUsernameBtn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> Entrar no Chat';
+            }
+        }
+
+        // Nova função para atualizar status de atividade
+        function startActivityUpdates() {
+            console.log('Iniciando atualizações de status de atividade');
+            setInterval(async () => {
+                if (USER_DEVICE_ID && USERNAME) {
+                    try {
+                        await database.ref(`users/${USER_DEVICE_ID}`).update({
+                            lastActive: firebase.database.ServerValue.TIMESTAMP,
+                            username: USERNAME // Mantém o nome atualizado também
+                        });
+                    } catch (error) {
+                        console.error('Erro ao atualizar status de atividade:', error);
+                    }
+                }
+            }, 60000); // Atualiza a cada 1 minuto
+        }
+
+        // Configura usuário ao carregar
+        async function setupUser() {
+            USER_DEVICE_ID = getOrCreateDeviceId();
+            const storedUsername = localStorage.getItem('username');
+
+            updateUserDisplay();
+
+            if (!storedUsername) {
+                console.log("Nenhum nome de usuário local encontrado. Mostrando modal.");
+                showWelcomeModal();
+            } else {
+                USERNAME = storedUsername;
+                console.log(`Nome de usuário encontrado localmente: ${USERNAME}`);
+                updateUserDisplay();
+                await saveUserToFirebase();
+                initialLoadComplete = true;
+                loadChatHistoryAndInit();
+                startActivityUpdates();
+            }
+        }
+
+        // Funções Principais de Chat
+        async function initGeminiChat(history = [], modelIdToInit) {
+            chat = null;
+            if (currentChatView !== 'general' && currentChatView !== 'own') {
+                console.log("Não inicializando objeto 'chat' para a view:", currentChatView);
+                enableChatInput(false);
+                return false;
+            }
+
+            if (!genAI) {
+                console.error("SDK Gemini não inicializado.");
+                appendSystemMessage("Erro crítico: SDK Gemini não disponível.", "error");
+                return false;
+            }
+            if (!modelIdToInit) {
+                console.error("ID do modelo não fornecido para initGeminiChat.");
+                appendSystemMessage("Erro interno: ID do modelo não especificado.", "error");
+                return false;
+            }
+
+            appendSystemMessage(`Inicializando chat (${currentChatView}) com ${modelIdToInit}...`);
+            enableChatInput(false);
+
+            try {
+                console.log(`Iniciando modelo: ${modelIdToInit}, view: ${currentChatView}`);
+                const model = genAI.getGenerativeModel({ model: modelIdToInit });
+                chat = model.startChat({
+                    history: history,
+                    generationConfig: {
+                        maxOutputTokens: 2000,
+                    },
+                });
+                console.log(`Chat (${modelIdToInit} - ${currentChatView}) inicializado com ${history.length} mensagens no histórico.`);
+                appendSystemMessage(`Chat (${currentChatView}) pronto.`);
+                enableChatInput(true);
+                return true;
+            } catch (error) {
+                console.error(`Erro ao inicializar Gemini Chat (${modelIdToInit} - ${currentChatView}):`, error);
+                let errorMsg = `Falha ao inicializar chat (${currentChatView}) com ${modelIdToInit}.`;
+                if (error.message?.includes('API key not valid')) {
+                    errorMsg = `Falha (${modelIdToInit}): Chave da API Gemini inválida ou expirada. Verifique a chave no código.`;
+                } else if (error.message?.includes('fetch') || error.message?.includes('Network Error')) {
+                    errorMsg = `Falha (${modelIdToInit}): Erro de rede ao contatar a API Gemini. Verifique sua conexão.`;
+                } else if (error.message?.includes('404')) {
+                    errorMsg = `Falha (${modelIdToInit}): Modelo não encontrado (404). Verifique o ID do modelo.`;
+                } else if (error.message?.includes('400')) {
+                    errorMsg = `Falha (${modelIdToInit}): Requisição inválida (400). Pode ser um problema no histórico ou configuração.`;
+                } else if (error.message?.includes('Quota') || error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+                    errorMsg = `Falha (${modelIdToInit}): Cota da API Gemini excedida.`;
+                } else {
+                    errorMsg = `Falha (${modelIdToInit}): ${error.message || 'Erro desconhecido na API Gemini.'}`;
+                }
+                appendSystemMessage(errorMsg, 'error');
+                enableChatInput(false);
+                return false;
+            }
+        }
+
+        function appendMessage(message, animate = true, messageKey = null) {
+            if (!message || typeof message.text !== 'string' || !chatMessages) return;
+
+            const initialMsgEl = chatMessages.querySelector('.initial-message');
+            if (initialMsgEl) initialMsgEl.remove();
+
+            const messageElement = document.createElement('div');
+            if (animate) messageElement.classList.add('message-enter');
+            if (messageKey) messageElement.id = `msg-${messageKey}`;
+
+            const messageText = message.text;
+            const timestamp = message.timestamp ? formatTime(message.timestamp) : "";
+            const senderDeviceId = message.deviceId || null;
+
+            if (message.sender === 'user') {
+                const isOwnMessage = senderDeviceId === USER_DEVICE_ID;
+                const justifyClass = isOwnMessage ? 'justify-end' : 'justify-start';
+                const bubbleColor = isOwnMessage ? 'gradient-bg text-white' : 'bg-blue-100 text-blue-900';
+                const showUserIdTag = !isOwnMessage && senderDeviceId && (currentChatView === 'general' || currentChatView === 'other');
+                const userIdTag = showUserIdTag ? `<span class="text-xs text-blue-700 ml-2">${senderDeviceId.substring(0, 6)}...</span>` : '';
+
+                messageElement.innerHTML = `
+                    <div class="flex ${justifyClass} mb-2 items-end gap-2">
+                        ${!isOwnMessage ? `<div class="user-avatar">${message.username?.charAt(0).toUpperCase() || '?'}</div>` : ''}
+                        <div class="message-bubble user ${bubbleColor} px-4 py-3 max-w-[80%] sm:max-w-[75%] break-words">
+                            <div class="flex items-center mb-1">
+                                <span class="font-medium">${isOwnMessage ? 'Você' : (message.username || 'Usuário')}</span>
+                                ${userIdTag}
+                            </div>
+                            <p>${escapeHtml(messageText)}</p>
+                            <div class="text-xs ${isOwnMessage ? 'text-indigo-200' : 'text-blue-600'} mt-2 text-right">${timestamp}</div>
+                        </div>
+                        ${isOwnMessage ? `<div class="user-avatar">${USERNAME?.charAt(0).toUpperCase() || '?'}</div>` : ''}
+                    </div>`;
+            } else {
+                const formattedText = formatMarkdown(messageText);
+                const isErrorOrBlocked = message.isError || messageText.toLowerCase().startsWith("erro") || messageText.toLowerCase().startsWith("falha") || messageText.toLowerCase().startsWith("bloqueado") || messageText.toLowerCase().includes("não foi possível processar");
+                const bubbleBg = isErrorOrBlocked ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800';
+
+                messageElement.innerHTML = `
+                    <div class="flex justify-start mb-2 items-end gap-2">
+                        <div class="bot-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-bubble ${bubbleBg} px-4 py-3 max-w-[80%] sm:max-w-[75%] break-words">
+                            <div class="flex items-center mb-1">
+                                <span class="font-medium">Gemini</span>
+                            </div>
+                            <div class="markdown-content">${formattedText}</div>
+                            <div class="text-xs text-gray-500 mt-2">${timestamp}</div>
+                        </div>
+                    </div>`;
+            }
+            chatMessages.appendChild(messageElement);
+            scrollToBottom();
+        }
+
+        function appendSystemMessage(text, type = 'info') {
+            if (!chatMessages) return;
+            const initialMsgEl = chatMessages.querySelector('.initial-message');
+            if (initialMsgEl) initialMsgEl.remove();
+
+            const element = document.createElement('div');
+            element.classList.add('message-enter', 'flex', 'justify-center', 'my-2');
+            
+            let bgColor = 'bg-yellow-100 text-yellow-800';
+            if (type === 'error') {
+                bgColor = 'bg-red-100 text-red-800';
+            } else if (type === 'success') {
+                bgColor = 'bg-green-100 text-green-800';
+            }
+
+            element.innerHTML = `
+                <div class="${bgColor} rounded-xl px-4 py-2 max-w-[90%] sm:max-w-md lg:max-w-lg text-sm text-center system-message">
+                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'} mr-2"></i>
+                    <span>${escapeHtml(text)}</span>
+                </div>`;
+
+            chatMessages.appendChild(element);
+            scrollToBottom();
+
+            // Remove mensagens de inicialização após alguns segundos
+            if (text.includes('Inicializando chat')) {
+                setTimeout(() => {
+                    element.remove();
+                }, 1500);
+            } else if (text.includes('Chat') && text.includes('pronto')) {
+                // Mantém a mensagem de "Chat pronto" por menos tempo
+                setTimeout(() => {
+                    element.style.transition = 'opacity 0.5s ease-out';
+                    element.style.opacity = '0';
+                    setTimeout(() => element.remove(), 500);
+                }, 2000);
+            }
+        }
+
+        async function getGeminiResponse(userMessageText) {
+            if (currentChatView !== 'general' && currentChatView !== 'own') {
+                console.warn("Tentativa de chamar getGeminiResponse em view inválida:", currentChatView);
+                return;
+            }
+            if (!chat) {
+                console.error("Objeto 'chat' não inicializado em getGeminiResponse.");
+                appendSystemMessage("Erro: O chat não está pronto para receber mensagens.", "error");
+                enableChatInput(true);
+                return;
+            }
+            if (!genAI) {
+                console.error("SDK Gemini não inicializado.");
+                appendSystemMessage("Erro crítico: SDK Gemini não disponível.", "error");
+                enableChatInput(true);
+                return;
+            }
+
+            isGeminiTyping = true;
+            if (typingIndicator) typingIndicator.classList.remove('hidden');
+            scrollToBottom();
+
+            const sanitizedModelId = sanitizeForFirebasePath(currentModelId);
+            if (!sanitizedModelId) {
+                console.error("ID do modelo inválido após sanitização para salvar resposta.");
+                appendSystemMessage("Erro interno ao preparar para salvar resposta.", "error");
+                isGeminiTyping = false;
+                if (typingIndicator) typingIndicator.classList.add('hidden');
+                enableChatInput(true);
+                return;
+            }
+
+            let responseSavePath = null;
+            if (currentChatView === 'general') {
+                responseSavePath = `generalChat/${sanitizedModelId}`;
+            } else if (currentChatView === 'own' && USER_DEVICE_ID) {
+                responseSavePath = `userChats/${USER_DEVICE_ID}/${sanitizedModelId}`;
+            }
+
+            if (!responseSavePath) {
+                console.error("Não foi possível determinar o caminho para salvar a resposta do Gemini.");
+                appendSystemMessage("Erro interno ao salvar a resposta.", "error");
+                isGeminiTyping = false;
+                if (typingIndicator) typingIndicator.classList.add('hidden');
+                enableChatInput(true);
+                return;
+            }
+
+            try {
+                console.log(`Enviando para Gemini (${currentModelId} - ${currentChatView}):`, userMessageText);
+                const result = await chat.sendMessage(userMessageText);
+                const response = await result.response;
+                const geminiResponseText = response.text();
+                console.log(`Resposta recebida de Gemini (${currentModelId} - ${currentChatView}):`, geminiResponseText);
+
+                const responseRef = database.ref(responseSavePath).push();
+                await responseRef.set({
+                    text: geminiResponseText,
+                    sender: 'gemini',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    deviceId: null,
+                    isError: false
+                });
+                console.log("Resposta do Gemini salva no Firebase:", responseRef.key);
+
+            } catch (error) {
+                console.error(`Erro ao comunicar com Gemini ou salvar resposta (${currentModelId} - ${currentChatView}):`, error);
+                let errorTextToSave = `Erro ao processar sua mensagem com ${currentModelId}.`;
+                let displayError = true;
+
+                if (error.response?.promptFeedback?.blockReason) {
+                    errorTextToSave = `Mensagem bloqueada por ${currentModelId} devido a: ${error.response.promptFeedback.blockReason}.`;
+                } else if (error.message?.includes('RESOURCE_EXHAUSTED') || error.message?.includes('Quota')) {
+                    errorTextToSave = `Erro (${currentModelId}): Cota da API excedida. Não é possível processar mais mensagens no momento.`;
+                } else if (error.message?.includes('API key not valid')) {
+                    errorTextToSave = `Erro (${currentModelId}): Chave da API inválida. Verifique a configuração.`;
+                    displayError = false;
+                } else if (error.message?.includes('fetch') || error.message?.includes('Network Error')) {
+                    errorTextToSave = `Erro de rede ao tentar contatar ${currentModelId}. Verifique sua conexão.`;
+                } else if (error.message) {
+                    errorTextToSave = `Erro Gemini (${currentModelId}): ${error.message}`;
+                }
+
+                const errorRef = database.ref(responseSavePath).push();
+                await errorRef.set({
+                    text: errorTextToSave,
+                    sender: 'gemini',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    deviceId: null,
+                    isError: true
+                });
+                console.log("Mensagem de erro do Gemini salva no Firebase:", errorRef.key);
+
+            } finally {
+                isGeminiTyping = false;
+                if (typingIndicator) typingIndicator.classList.add('hidden');
+                enableChatInput(true);
+            }
+        }
+
+        function enableChatInput(enabled) {
+            const isConnected = statusText.textContent === 'Online';
+            const canEnable = enabled &&
+                            (currentChatView === 'general' || currentChatView === 'own') &&
+                            !!chat &&
+                            !isGeminiTyping &&
+                            isConnected;
+
+            if (messageInput) {
+                messageInput.disabled = !canEnable;
+                messageInput.classList.toggle('bg-gray-100', !canEnable);
+                messageInput.classList.toggle('cursor-not-allowed', !canEnable);
+                if (!isConnected) {
+                    messageInput.placeholder = "Desconectado do Firebase...";
+                } else if (currentChatView === 'other') {
+                    messageInput.placeholder = "Visualizando chat de outro usuário...";
+                } else if (!chat && (currentChatView === 'general' || currentChatView === 'own')) {
+                    messageInput.placeholder = "Inicializando chat...";
+                } else if (isGeminiTyping) {
+                    messageInput.placeholder = "Aguardando resposta do Gemini...";
+                } else if (!canEnable) {
+                    messageInput.placeholder = "Carregando ou indisponível...";
+                } else {
+                    messageInput.placeholder = "Digite sua mensagem...";
+                }
+            }
+            if (messageSubmitButton) {
+                messageSubmitButton.disabled = !canEnable;
+                messageSubmitButton.classList.toggle('opacity-50', !canEnable);
+                messageSubmitButton.classList.toggle('cursor-not-allowed', !canEnable);
+            }
+        }
+
+        async function loadMoreMessages() {
+            if (isLoadingMore || !currentMessagesRef || !firstMessageTimestamp) return;
+            
+            isLoadingMore = true;
+            
+            try {
+                const snapshot = await currentMessagesRef
+                    .orderByChild('timestamp')
+                    .endBefore(firstMessageTimestamp)
+                    .limitToLast(MESSAGES_PER_PAGE)
+                    .once('value');
+                    
+                const messagesData = snapshot.val();
+                if (!messagesData) {
+                    console.log('Não há mais mensagens para carregar');
+                    return;
+                }
+
+                const sortedKeys = Object.keys(messagesData).sort((a, b) => 
+                    messagesData[a].timestamp - messagesData[b].timestamp
+                );
+
+                // Atualiza o timestamp da primeira mensagem para a próxima paginação
+                firstMessageTimestamp = messagesData[sortedKeys[0]].timestamp;
+
+                // Prepend messages to the top
+                sortedKeys.forEach((key) => {
+                    const msg = messagesData[key];
+                    if (msg && msg.timestamp && !document.getElementById(`msg-${key}`)) {
+                        messageCounter++;
+                        const messageElement = document.createElement('div');
+                        appendMessage(msg, false, key);
+                        chatMessages.insertBefore(messageElement, chatMessages.firstChild);
+                    }
+                });
+
+                updateMessageCountDisplay();
+
+            } catch (error) {
+                console.error('Erro ao carregar mais mensagens:', error);
+            } finally {
+                isLoadingMore = false;
+            }
+        }
+
+        async function loadChatHistoryAndInit() {
+            if (!initialLoadComplete) {
+                console.log("Aguardando configuração inicial do usuário antes de carregar o chat.");
+                if (chatMessages) chatMessages.innerHTML = '<div class="text-center text-gray-500 py-10 initial-message"><i class="fas fa-user-clock text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Por favor, defina seu nome de usuário primeiro.</p></div>';
+                return;
+            }
+
+            console.log(`Iniciando carregamento: View='${currentChatView}', Model='${currentModelId}', Target='${targetChatId || (currentChatView === 'general' ? 'Geral' : 'Meu')}'`);
+            enableChatInput(false);
+            if (chatMessages) chatMessages.innerHTML = '<div class="text-center text-gray-500 py-10 initial-message"><i class="fas fa-spinner fa-spin text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Carregando mensagens...</p></div>';
+            messageCounter = 0;
+            updateMessageCountDisplay();
+            updateChatInfoLabel();
+            updateActiveButton();
+
+            if (currentMessagesRef && currentFirebaseListener) {
+                console.log("Desanexando listener Firebase anterior da Ref:", currentMessagesRef.toString());
+                try {
+                    currentMessagesRef.off('child_added', currentFirebaseListener);
+                    console.log("Listener Firebase desanexado com sucesso.");
+                } catch(detachError) {
+                    console.error("Erro ao tentar desanexar listener Firebase:", detachError);
+                }
+            } else {
+                console.log("Nenhum listener/ref Firebase anterior para desanexar (ou um deles era null). Ref:", currentMessagesRef, "Listener:", typeof currentFirebaseListener);
+            }
+
+            currentFirebaseListener = null;
+            currentMessagesRef = null;
+            chat = null;
+            targetChatId = (currentChatView === 'other') ? targetChatId : null;
+
+            let fbPath = null;
+            const sanitizedModelId = sanitizeForFirebasePath(currentModelId);
+
+            if (!sanitizedModelId) {
+                const errMsg = "Erro crítico: ID do modelo inválido após sanitização.";
+                console.error(errMsg);
+                appendSystemMessage(errMsg, "error");
+                if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-red-500 py-10"><p>${errMsg}</p></div>`;
+                return;
+            }
+
+            if (currentChatView === 'general') {
+                fbPath = `generalChat/${sanitizedModelId}`;
+            } else if (currentChatView === 'own' && USER_DEVICE_ID) {
+                fbPath = `userChats/${USER_DEVICE_ID}/${sanitizedModelId}`;
+            } else if (currentChatView === 'other') {
+                const searchTerm = userSearchInput.value.trim();
+                if (!searchTerm) {
+                    appendSystemMessage("Por favor, insira um nome de usuário ou ID para buscar.", "info");
+                    if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-gray-500 py-10 initial-message"><i class="fas fa-search text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Digite um nome ou ID acima para ver o chat.</p></div>`;
+                    enableChatInput(false);
+                    return;
+                }
+
+                appendSystemMessage(`Buscando usuário: ${searchTerm}...`, 'info');
+                let foundUserId = null;
+
+                if (!searchTerm.startsWith('user-')) {
+                    const searchUsername = searchTerm.toLowerCase();
+                    try {
+                        const usernameSnapshot = await database.ref(`usernames/${searchUsername}`).once('value');
+                        if (usernameSnapshot.exists()) {
+                            foundUserId = usernameSnapshot.val();
+                            console.log(`Nome de usuário '${searchTerm}' encontrado. ID: ${foundUserId}`);
+                        } else {
+                            console.log(`Nome de usuário '${searchTerm}' não encontrado no índice.`);
+                        }
+                    } catch (error) {
+                        console.error("Erro ao buscar username no Firebase:", error);
+                        appendSystemMessage(`Erro ao buscar nome '${searchTerm}'.`, "error");
+                    }
+                }
+
+                if (!foundUserId) {
+                    if (searchTerm.startsWith('user-')) {
+                        foundUserId = searchTerm;
+                        console.log(`Termo '${searchTerm}' parece ser um ID. Verificando existência...`);
+                    } else {
+                        appendSystemMessage(`Usuário '${searchTerm}' não encontrado. Verifique o nome ou ID.`, "error");
+                        if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-red-500 py-10 initial-message"><i class="fas fa-user-slash text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Usuário '${escapeHtml(searchTerm)}' não encontrado.</p></div>`;
+                        enableChatInput(false);
+                        return;
+                    }
+                }
+
+                if(foundUserId){
+                    try {
+                        const userExistsSnapshot = await database.ref(`users/${foundUserId}`).once('value');
+                        if (!userExistsSnapshot.exists()) {
+                            console.warn(`ID '${foundUserId}' (encontrado ou digitado) não existe no nó /users.`);
+                            appendSystemMessage(`Usuário com ID '${foundUserId.substring(0,8)}...' não encontrado no banco de dados.`, "error");
+                            if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-red-500 py-10 initial-message"><i class="fas fa-user-slash text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Usuário não existe.</p></div>`;
+                            enableChatInput(false);
+                            return;
+                        } else {
+                            targetChatId = foundUserId;
+                            fbPath = `userChats/${targetChatId}/${sanitizedModelId}`;
+                            console.log(`Visualizando chat para ID: ${targetChatId}`);
+                            appendSystemMessage(`⚠️ Lembre-se: Para ver o chat de outro usuário, as Regras de Segurança do Firebase devem permitir leitura em 'userChats/${targetChatId}'.`, "info");
+                        }
+                    } catch (checkError) {
+                        console.error(`Erro ao verificar existência do usuário ${foundUserId}:`, checkError);
+                        appendSystemMessage(`Erro ao verificar usuário. Tente novamente.`, "error");
+                        enableChatInput(false);
+                        return;
+                    }
+                } else {
+                    appendSystemMessage(`Não foi possível identificar o usuário '${searchTerm}'.`, "error");
+                    if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-red-500 py-10 initial-message"><i class="fas fa-question-circle text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Não foi possível encontrar o usuário.</p></div>`;
+                    enableChatInput(false);
+                    return;
+                }
+            }
+
+            if (!fbPath) {
+                const errorMsg = currentChatView === 'own' && !USER_DEVICE_ID
+                    ? "Erro: ID do dispositivo do usuário não definido para carregar 'Meu Chat'."
+                    : "Não foi possível determinar o caminho del chat no Firebase.";
+                console.error(errorMsg);
+                appendSystemMessage(errorMsg, "error");
+                if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-red-500 py-10"><p>${errorMsg}</p></div>`;
+                enableChatInput(false);
+                return;
+            }
+
+            currentMessagesRef = database.ref(fbPath);
+            console.log(`Definida nova referência Firebase para: ${fbPath}`);
+
+            try {
+                const snapshot = await currentMessagesRef.orderByChild('timestamp').limitToLast(1000).once('value');
+                const messagesData = snapshot.val();
+                const historyForGemini = [];
+                let lastMessageTimestamp = 0;
+
+                if (chatMessages) chatMessages.innerHTML = '';
+
+                if (messagesData) {
+                    console.log(`Histórico inicial carregado para ${currentChatView}: ${Object.keys(messagesData).length} mensagens.`);
+                    const sortedKeys = Object.keys(messagesData).sort((a, b) => messagesData[a].timestamp - messagesData[b].timestamp);
+
+                    sortedKeys.forEach((key) => {
+                        messageCounter++;
+                        const msg = messagesData[key];
+                        if (msg && msg.timestamp) {
+                            appendMessage(msg, false, key);
+                            lastMessageTimestamp = Math.max(lastMessageTimestamp, msg.timestamp);
+
+                            if ((currentChatView === 'general' || currentChatView === 'own') && typeof msg.text === 'string' && !msg.isError) {
+                                const role = msg.sender === 'user' ? "user" : "model";
+                                const textContent = msg.text;
+                                if (textContent.trim()) {
+                                    historyForGemini.push({ role: role, parts: [{ text: textContent }] });
+                                } else {
+                                    console.warn("Mensagem com texto vazio encontrada no histórico, pulando para Gemini:", key);
+                                }
+                            }
+                        } else {
+                            console.warn("Mensagem inválida ou sem timestamp encontrada no histórico:", key, msg);
+                        }
+                    });
+
+                    // Salva o timestamp da primeira mensagem para paginação
+                    if (sortedKeys.length > 0) {
+                        firstMessageTimestamp = messagesData[sortedKeys[0]].timestamp;
+                    }
+
+                    if (sortedKeys.length === 0) {
+                        if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-gray-500 py-10 initial-message"><i class="fas fa-comments text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Nenhuma mensagem neste chat ainda.</p></div>`;
+                    }
+                } else {
+                    console.log(`Nenhum histórico encontrado para ${fbPath}.`);
+                    if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-gray-500 py-10 initial-message"><i class="fas fa-comments text-3xl sm:text-4xl mb-2"></i><p class="text-sm sm:text-base">Nenhuma mensagem neste chat ainda.</p></div>`;
+                }
+
+                updateMessageCountDisplay();
+                scrollToBottom();
+
+                let geminiInitOk = false;
+                if (currentChatView === 'general' || currentChatView === 'own') {
+                    geminiInitOk = await initGeminiChat(historyForGemini, currentModelId);
+                } else {
+                    geminiInitOk = true;
+                    console.log("Não inicializando objeto de chat Gemini para view 'other'.");
+                    enableChatInput(false);
+                }
+
+                if (geminiInitOk && currentMessagesRef) {
+                    currentFirebaseListener = (childSnapshot) => {
+                        const newMessage = childSnapshot.val();
+                        const messageKey = childSnapshot.key;
+
+                        if (newMessage && !document.getElementById(`msg-${messageKey}`)) {
+                            console.log(`Nova mensagem recebida via listener (${currentChatView}):`, messageKey);
+                            messageCounter++;
+                            appendMessage(newMessage, true, messageKey);
+                            updateMessageCountDisplay();
+                        } else if (!newMessage) {
+                            console.warn("Listener recebeu snapshot nulo:", messageKey);
+                        }
+                    };
+
+                    const startListeningTimestamp = lastMessageTimestamp > 0 ? lastMessageTimestamp + 1 : Date.now();
+                    currentMessagesRef.orderByChild('timestamp').startAt(startListeningTimestamp).on('child_added', currentFirebaseListener);
+                    console.log(`Listener Firebase anexado em ${fbPath} começando em ${new Date(startListeningTimestamp).toISOString()}`);
+
+                    if (currentChatView !== 'other') {
+                        enableChatInput(geminiInitOk);
+                    }
+
+                } else {
+                    console.warn("Inicialização do Gemini falhou ou referência Firebase inválida. Listener não anexado.");
+                    if (!geminiInitOk && (currentChatView === 'general' || currentChatView === 'own')) {
+                        appendSystemMessage("O chat não pôde ser iniciado corretamente. O envio de mensagens está deshabilitado.", "error");
+                    }
+                    enableChatInput(false);
+                }
+
+            } catch (error) {
+                console.error(`Erro CRÍTICO ao carregar histórico ou anexar listener para ${fbPath}:`, error);
+                let errorText = `Erro grave ao carregar o histórico do chat.`;
+                if (error.message?.toLowerCase().includes('permission_denied') || error.code?.toLowerCase().includes('permission_denied')) {
+                    errorText = `Erro de Permissão ao acessar ${fbPath}. Verifique as Regras de Segurança do Firebase Database.`;
+                    if (currentChatView === 'other') {
+                        errorText += ` Para ver o chat de outro usuário, as regras para '/userChats/$userId' devem permitir leitura.`;
+                    }
+                } else {
+                    errorText += ` Detalhes: ${error.message}`;
+                }
+                appendSystemMessage(errorText, "error");
+                if (chatMessages) chatMessages.innerHTML = `<div class="text-center text-red-500 py-10"><p>Erro ao carregar dados! Verifique as permissões ou o console para detalhes.</p></div>`;
+                enableChatInput(false);
+            }
+        }
+
+        function populateModelSelector() {
+            if (!modelSelect) return;
+            modelSelect.innerHTML = '';
+            AVAILABLE_MODELS.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = model.name;
+                if (model.id === currentModelId) {
+                    option.selected = true;
+                }
+                modelSelect.appendChild(option);
+            });
+        }
+
+        // Controle do menu móvel
+        const toggleControlsBtn = document.querySelector('.toggle-controls');
+        const controlsContainer = document.querySelector('.controls-container');
+
+        if (toggleControlsBtn && controlsContainer) {
+            toggleControlsBtn.classList.remove('hidden');
+            
+            toggleControlsBtn.addEventListener('click', () => {
+                controlsContainer.classList.toggle('active');
+                toggleControlsBtn.classList.toggle('active');
+            });
+            
+            // Fechar ao clicar fora
+            document.addEventListener('click', (e) => {
+                if (!controlsContainer.contains(e.target) && 
+                    !toggleControlsBtn.contains(e.target) && 
+                    controlsContainer.classList.contains('active')) {
+                    controlsContainer.classList.remove('active');
+                    toggleControlsBtn.classList.remove('active');
+                }
+            });
+        }
+
+        // Event Listeners
+        connectedRef.on("value", (snap) => {
+            const isConnected = snap.val();
+            console.log("Status Conexão Firebase:", isConnected);
+            if (statusIndicator) {
+                statusIndicator.classList.toggle('bg-green-500', isConnected);
+                statusIndicator.classList.toggle('bg-red-500', !isConnected);
+                statusIndicator.classList.toggle('animate-pulse', !isConnected);
+            }
+            if (statusText) statusText.textContent = isConnected ? 'Online' : 'Offline';
+            if (connectionStatus) {
+                connectionStatus.innerHTML = isConnected 
+                    ? '<i class="fas fa-circle mr-1 text-green-500"></i> Conectado' 
+                    : '<i class="fas fa-circle mr-1 text-red-500"></i> Desconectado';
+            }
+
+            enableChatInput(isConnected);
+
+            if (!isConnected) {
+                appendSystemMessage("Conexão com o Firebase perdida. Tentando reconectar...", "error");
+            } else {
+                console.log("Reconectado ao Firebase.");
+            }
+        });
+
+        if (modelSelect) {
+            modelSelect.addEventListener('change', (event) => {
+                const newModelId = event.target.value;
+                if (newModelId !== currentModelId) {
+                    currentModelId = newModelId;
+                    console.log(`Modelo selecionado: ${currentModelId}`);
+                    loadChatHistoryAndInit();
+                }
+            });
+        }
+
+        if (btnGeneralChat) {
+            btnGeneralChat.addEventListener('click', () => {
+                if (currentChatView !== 'general') {
+                    currentChatView = 'general';
+                    targetChatId = null;
+                    if(userSearchInput) userSearchInput.value = '';
+                    loadChatHistoryAndInit();
+                }
+            });
+        }
+
+        if (btnMyChat) {
+            btnMyChat.addEventListener('click', () => {
+                if (!USER_DEVICE_ID) {
+                    appendSystemMessage("Erro: ID do dispositivo não definido.", "error");
+                    showWelcomeModal();
+                    return;
+                }
+                if (currentChatView !== 'own') {
+                    currentChatView = 'own';
+                    targetChatId = null;
+                    if(userSearchInput) userSearchInput.value = '';
+                    loadChatHistoryAndInit();
+                }
+            });
+        }
+
+        if (btnOtherChat) {
+            btnOtherChat.addEventListener('click', () => {
+                const searchTerm = userSearchInput.value.trim();
+                if (!searchTerm) {
+                    appendSystemMessage("Digite um nome ou ID de usuário para buscar.", "info");
+                    userSearchInput.focus();
+                    return;
+                }
+                currentChatView = 'other';
+                loadChatHistoryAndInit();
+            });
+        }
+
+        if (userSearchInput) {
+            userSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    btnOtherChat.click();
+                }
+            });
+        }
+
+        if (messageForm) {
+            messageForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const messageText = messageInput.value.trim();
+
+                if (!messageText) return;
+                if (currentChatView === 'other') {
+                    appendSystemMessage("Você não pode enviar mensagens no chat de outro usuário.", "error");
+                    return;
+                }
+                if (currentChatView !== 'general' && currentChatView !== 'own') {
+                    appendSystemMessage("Não é possível enviar mensagens nesta visualização.", "error");
+                    return;
+                }
+                if (!USER_DEVICE_ID || !USERNAME) {
+                    appendSystemMessage("Erro: Usuário não configurado corretamente.", "error");
+                    showWelcomeModal();
+                                       return;
+                }
+                if (!chat) {
+                    appendSystemMessage("Erro: O objeto de chat não está inicializado.", "error");
+                    return;
+                }
+                if (!genAI) {
+                    appendSystemMessage("Erro crítico: SDK Gemini não disponível para enviar mensagem.", "error");
+                    return;
+                }
+
+                let userMessageSavePath = null;
+                const sanitizedModelId = sanitizeForFirebasePath(currentModelId);
+                if (!sanitizedModelId) {
+                    appendSystemMessage("Erro: ID do modelo inválido ao tentar salvar mensagem.", "error");
+                    return;
+                }
+
+                if (currentChatView === 'general') {
+                    userMessageSavePath = `generalChat/${sanitizedModelId}`;
+                } else if (currentChatView === 'own') {
+                    userMessageSavePath = `userChats/${USER_DEVICE_ID}/${sanitizedModelId}`;
+                }
+
+                if (!userMessageSavePath) {
+                    appendSystemMessage("Erro interno: Não foi possível determinar onde salvar sua mensagem.", "error");
+                    return;
+                }
+
+                enableChatInput(false);
+                const messageData = {
+                    text: messageText,
+                    sender: 'user',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    deviceId: USER_DEVICE_ID,
+                    username: USERNAME
+                };
+
+                const userMsgRef = database.ref(userMessageSavePath).push();
+                try {
+                    await userMsgRef.set(messageData);
+                    console.log(`Mensagem do usuário (${USERNAME}/${USER_DEVICE_ID}) salva em ${userMessageSavePath}:`, userMsgRef.key);
+                    messageInput.value = '';
+
+                    await getGeminiResponse(messageText);
+
+                } catch (error) {
+                    console.error("Erro ao salvar mensagem do usuário no Firebase:", error);
+                    appendSystemMessage("Erro ao enviar sua mensagem. Verifique sua conexão e tente novamente.", "error");
+                    enableChatInput(true);
+                } finally {
+                    if (!messageInput.disabled) {
+                        messageInput.focus();
+                    }
+                }
+            });
+        }
+
+        if (saveUsernameBtn) {
+            saveUsernameBtn.addEventListener('click', handleSaveUsername);
+        }
+        if (usernameInput) {
+            usernameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleSaveUsername();
+                }
+            });
+        }
+
+        if (chatMessages) {
+            chatMessages.addEventListener('scroll', () => {
+                if (chatMessages.scrollTop === 0 && !isLoadingMore) {
+                    loadMoreMessages();
+                }
+            });
+        }
+
+        // Inicialização da Aplicação
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Carregado. Iniciando aplicação...");
+            populateModelSelector();
+            setupUser();
+            if (messageInput) messageInput.focus();
+            console.log("Interface inicializada.");
+        });
+
+    </script>
+</body>
+</html>
